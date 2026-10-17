@@ -1,0 +1,85 @@
+# ============================================================
+# Program 04 — Real Bound U = λ M_0 - I(ρ) + C* < 0
+# ============================================================
+# Combines M_0 (from Program 02) with I(ρ), C* (from Program 03)
+# to verify the real bound U < 0, which is the analytic input
+# to the irrationality proof.
+#
+# For worst-case (upper bound) on U:
+#   M_0 enters with +λ  → use M_0 upper bound
+#   -I(ρ) enters with -1 → use I(ρ) lower bound
+#   C_* enters with +1  → use C_* upper bound
+# ============================================================
+
+from sage.all import *
+
+R = RealIntervalField(300)
+
+# ---------- Parameters ----------
+lam = R(37)/R(40)
+
+# ---------- Inputs from previous programs ----------
+# From Program 02: rigorous upper bound on M_0
+M0_upper = R(QQ(-6004737952929)) / R(10**12)   # = -6.004737952929
+
+# From Program 03: I(ρ) (tight interval, but use lower bound)
+I_rho_lower = R(QQ(-2587449401323)) / R(10**12)  # = -2.587449401323
+
+# From Program 03: C_* (use upper bound)
+C_star_upper = R(QQ(660437713518)) / R(10**12)   # = 0.660437713518
+
+print("=" * 62)
+print("Program 04 — Real Bound U")
+print("=" * 62)
+print("Inputs (worst-case bounds):")
+print(f"  λ          = {float(lam):.12f}")
+print(f"  M_0 upper  = {float(M0_upper):.12f}   (from Program 02)")
+print(f"  I(ρ) lower = {float(I_rho_lower):.12f}   (from Program 03)")
+print(f"  C_* upper  = {float(C_star_upper):.12f}   (from Program 03)")
+print("-" * 62)
+
+# ---------- Compute U ----------
+# U = λ M_0 - I(ρ) + C_*
+term1 = lam * M0_upper            # upper bound of λ M_0 (since λ>0)
+term2 = -I_rho_lower              # upper bound of -I(ρ) (I lower → -I larger)
+term3 = C_star_upper              # upper bound of C_*
+U_upper = term1 + term2 + term3
+
+print("Decomposition (each term's upper bound):")
+print(f"  λ · M_0    ≤ {float(term1):.12f}")
+print(f"  -I(ρ)      ≤ {float(term2):.12f}")
+print(f"  C_*        ≤ {float(term3):.12f}")
+print(f"  ---------------------------------")
+print(f"  U          ≤ {float(U_upper):.12f}")
+print("-" * 62)
+
+# ---------- Verification ----------
+passes = float(U_upper) < 0.0
+margin = -float(U_upper)
+
+print("Verification:")
+print(f"  U < 0               : {passes}")
+if passes:
+    print(f"  Margin |U|          : {margin:.12f}")
+    print(f"  Interpretation      : real bound is negative,")
+    print(f"                        with margin {margin:.4f} on the K² scale.")
+print("-" * 62)
+
+# ---------- Also report U's conservative version ----------
+# If we use the paper's M_0 = -6.0 exactly (round number, conservative):
+M0_conservative = R(-6)
+U_conservative = lam*M0_conservative - I_rho_lower + C_star_upper
+print("Conservative check (using M_0 = -6.0 exactly):")
+print(f"  U (conservative)    = {float(U_conservative):.12f}")
+print(f"  Still < 0           : {float(U_conservative) < 0}")
+print("-" * 62)
+
+ok = passes and float(U_conservative) < 0
+print(f"==> {'PASS' if ok else 'FAIL'} (Program 04)")
+print("=" * 62)
+
+# ---------- Export value for later programs ----------
+print()
+print("Copy this for downstream use:")
+print(f"  U (conservative) = {float(U_conservative):.12f}")
+print(f"  U (tight)        = {float(U_upper):.12f}")

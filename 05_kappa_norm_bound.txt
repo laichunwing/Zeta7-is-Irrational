@@ -1,0 +1,83 @@
+# ============================================================
+# Program 05 — κ Bound (ν = 2) — FIXED
+# ============================================================
+# Fix: int(nu) → int(float(nu)); float(nu*alpha) is fine.
+# ============================================================
+
+from sage.all import *
+
+R = RealIntervalField(300)
+Rpi = R(pi)
+
+# ---------- Parameters ----------
+nu    = R(2)
+alpha = R(3)/R(40)
+
+print("=" * 62)
+print("Program 05 — κ Bound (ν = 2)")
+print("=" * 62)
+print(f"ν = {int(float(nu))}   α = {float(alpha):.10f}   να = {float(nu*alpha):.10f}")
+print("-" * 62)
+
+# ---------- Five terms of κ ----------
+t1 = R(2)*Rpi / R(3).sqrt()
+t2 = (R(4)/R(3)).log()
+t3 = nu * alpha * (R(18).log())
+t4 = (R(37)/R(40)) * (R(1) + (R(1600)/R(111)).log())
+t5 = (R(37)/R(20)) * ((R(43) + R(4)*R(114).sqrt())/R(5)).log()
+
+# ---------- κ ----------
+kappa = t1 + t2 + t3 + t4 + t5
+
+kappa_upper = float(kappa.upper())
+kappa_lower = float(kappa.lower())
+kappa_mid   = float(kappa)
+
+print(f"Decomposition of κ (upper bounds):")
+print(f"  t1 = 2π/√3                          ≤ {float(t1.upper()):.12f}")
+print(f"  t2 = log(4/3)                       ≤ {float(t2.upper()):.12f}")
+print(f"  t3 = να·log(18)                     ≤ {float(t3.upper()):.12f}")
+print(f"  t4 = (37/40)(1 + log(1600/111))     ≤ {float(t4.upper()):.12f}")
+print(f"  t5 = (37/20)log((43+4√114)/5)       ≤ {float(t5.upper()):.12f}")
+print(f"  ---------------------------------------------")
+print(f"  κ                                   ≤ {kappa_upper:.12f}")
+print("-" * 62)
+
+print(f"Rigorous enclosure:")
+print(f"  κ ∈ [{kappa_lower:.12f}, {kappa_upper:.12f}]")
+print(f"  κ ≈ {kappa_mid:.12f}")
+print("-" * 62)
+
+# ---------- Thresholds ----------
+print("Threshold checks:")
+thresholds = [
+    ("13.01",                       R(1301)/R(100)),
+    ("13.10",                       R(1310)/R(100)),
+    ("13.50",                       R(1350)/R(100)),
+    ("14.00",                       R(14)),
+    ("14.301 (paper's ν=8 value)",  R(14301)/R(1000)),
+]
+all_ok = True
+for name, thr in thresholds:
+    ok = kappa < thr
+    print(f"  κ < {name:>30} : {ok}")
+    if not ok:
+        all_ok = False
+
+print("-" * 62)
+
+primary_check = kappa < R(1301)/R(100)
+print(f"Primary check κ < 13.01 : {primary_check}")
+
+safe_check = kappa < R(1310)/R(100)
+print(f"Safe check    κ < 13.10 : {safe_check}")
+
+ok = primary_check and safe_check
+print(f"==> {'PASS' if ok else 'FAIL'} (Program 05)")
+print("=" * 62)
+
+print()
+print("Copy this for downstream (Program 10):")
+print(f"  κ (upper bound) = {kappa_upper:.12f}")
+print(f"  κ (rounded up)  = 13.0")
+print(f"  Use κ = 13.0 for the approximation bound.")

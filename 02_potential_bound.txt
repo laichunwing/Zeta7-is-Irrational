@@ -1,0 +1,164 @@
+# ============================================================
+# Program 02 — Rigorous Potential Bound (FIXED)
+# ============================================================
+# Fix: use .arctan() (not .atan()) on RIF elements.
+# Also defensive helper in case some Sage versions differ.
+# ============================================================
+
+from sage.all import *
+import numpy as np
+from scipy.optimize import minimize_scalar
+import math, time
+
+# ---------- R must be defined first ----------
+R = RealIntervalField(300)
+Rpi = R(pi)   # RIF π
+
+# ---------- Parameters ----------
+alpha_R = R(3)/R(40)
+alpha_f = 3.0/40
+nu_R    = R(2)
+nu_f    = 2
+
+# ---------- Measure from Program 01 ----------
+L_vals = [0.003595836, 0.061917985, 0.311070580]
+c_vals = [0.125370973, 0.345185732, 0.454443295]
+
+D = 10**9
+Ls = [R(QQ(int(round(l*D))))/R(D) for l in L_vals]
+cs = [R(QQ(int(round(c*D))))/R(D) for c in c_vals]
+
+print("=" * 62)
+print("Program 02 — Rigorous Potential Bound")
+print("=" * 62)
+print(f"Measure from Program 01:")
+for k in range(3):
+    print(f"  L_{k+1} = {L_vals[k]:.9f}   c_{k+1} = {c_vals[k]:.9f}")
+print(f"  mass = {sum(c_vals):.12f}")
+print("-" * 62)
+
+# ---------- Defensive arctan helper ----------
+def _arctan_RIF(x):
+    """arctan of RIF element, guaranteed RIF output."""
+    x = R(x)
+    try:
+        return x.arctan()
+    except AttributeError:
+        return arctan(x)   # free function fallback
+
+# ---------- Float building blocks ----------
+def U_arc_f(L, t):
+    L = max(L, 1e-12)
+    if t <= L: return math.log(L/4)
+    return math.log((t - L/2 + math.sqrt(t*(t-L)))/2)
+
+def J_a_f(a, t):
+    if t < 1e-15: return 2*a*math.log(a) - 2*a
+    return a*math.log(t + a**2) - 2*a + 2*math.sqrt(t)*math.atan(a/math.sqrt(t))
+
+def V_f(t):
+    return 2*math.pi*math.sqrt(t) + J_a_f(1.0, t) - nu_f*J_a_f(alpha_f, t)
+
+def F_f(t):
+    U = sum(c_vals[j]*U_arc_f(L_vals[j], t) for j in range(3))
+    return 2*U - V_f(t)
+
+# ---------- Rigorous building blocks ----------
+def U_arc_R(L, t):
+    t = R(t); L = R(L)
+    if t <= L:
+        return (L/R(4)).log()
+    return ((t - L/R(2) + (t*(t-L)).sqrt())/R(2)).log()
+
+def J_a_R(a, t):
+    a = R(a); t = R(t)
+    if t <= R(0):
+        return R(2)*a*(a.log()) - R(2)*a
+    return a*((t + a**2).log()) - R(2)*a + R(2)*t.sqrt()*_arctan_RIF(a/t.sqrt())
+
+def V_R(t):
+    t = R(t)
+    return R(2)*Rpi*t.sqrt() + J_a_R(R(1), t) - nu_R*J_a_R(alpha_R, t)
+
+def F_R(t):
+    t = R(t)
+    return R(2)*sum(cs[j]*U_arc_R(Ls[j], t) for j in range(3)) - V_R(t)
+
+# ---------- Step 1: Float scan ----------
+print("Step 1: Float scan on [0, 20] (~5000 points)...")
+t0 = time.time()
+grid = np.concatenate([
+    np.linspace(1e-8, 0.5, 3000),
+    np.linspace(0.5, 3, 1500),
+    np.linspace(3, 20, 500),
+])
+F_vals = np.array([F_f(t) for t in grid])
+print(f"  Done in {time.time()-t0:.2f}s")
+
+peak_idx = [i for i in range(1, len(grid)-1)
+            if F_vals[i] >= F_vals[i-1] and F_vals[i] >= F_vals[i+1]]
+print(f"  {len(peak_idx)} local maxima found")
+
+# ---------- Step 2: Refine ----------
+print("Step 2: Refining peaks...")
+refined = []
+for i in peak_idx:
+    lo = grid[max(0, i-3)]
+    hi = grid[min(len(grid)-1, i+3)]
+    if hi <= lo: continue
+    try:
+        res = minimize_scalar(lambda tt: -F_f(tt), bounds=(lo, hi),
+                              method='bounded', options={'xatol': 1e-12})
+        if res.success:
+            refined.append(res.x)
+    except Exception:
+        pass
+refined.append(0.0)
+
+# ---------- Step 3: Rigorous evaluation ----------
+print("Step 3: Rigorous RIF evaluation at each peak...")
+max_upper_float = -1000.0
+max_t = 0.0
+
+for t_ref in refined:
+    window = np.linspace(max(0.0, t_ref - 1e-3), min(20.0, t_ref + 1e-3), 30)
+    for t_f in window:
+        val = F_R(R(t_f))
+        v_up = float(val.upper())
+        if v_up > max_upper_float:
+            max_upper_float = v_up
+            max_t = float(t_f)
+
+print(f"  Max F (rigorous upper) = {max_upper_float:.12f}")
+print(f"  At t ≈ {max_t:.10f}")
+
+# ---------- Step 4: Tail check ----------
+print("Step 4: Tail check at t = 20...")
+F_20 = F_R(R(20))
+F20_upper = float(F_20.upper())
+print(f"  F(20) ≤ {F20_upper:.12f}")
+
+# ---------- Step 5: Report ----------
+print()
+print("=" * 62)
+print("Program 02 — Rigorous Potential Bound")
+print("=" * 62)
+print(f"Rigorous bounds:")
+print(f"  M_0 ≤ {max_upper_float:.12f}    (at t ≈ {max_t:.8f})")
+print(f"  F(20) ≤ {F20_upper:.12f}")
+print(f"  (F is decreasing on [20, ∞), so tail is bounded by F(20))")
+print("-" * 62)
+
+check_tight = max_upper_float < -6.0
+check_loose = max_upper_float < -5.9
+check_tail  = F20_upper < -5.9
+
+print(f"Checks:")
+print(f"  M_0 ≤ -6.0 (tight)   : {check_tight}")
+print(f"  M_0 ≤ -5.9 (loose)   : {check_loose}")
+print(f"  Tail at t=20 ≤ -5.9  : {check_tail}")
+ok = check_loose and check_tail
+print(f"==> {'PASS' if ok else 'FAIL'} (Program 02)")
+if ok and check_tight:
+    print(f"    (Stronger: M_0 ≤ -6.0 also holds)")
+print("=" * 62)

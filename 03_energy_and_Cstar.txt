@@ -1,0 +1,76 @@
+# ============================================================
+# Program 03 — Energy I(ρ) and Constant C* for ν = 2
+# ============================================================
+from sage.all import *
+
+R = RealIntervalField(300)
+Rpi = R(pi)
+
+# ---------- Parameters ----------
+alpha = R(3)/R(40)
+lam   = R(37)/R(40)
+nu    = R(2)
+
+# ---------- Measure from Program 01 ----------
+L_vals = [0.003595836, 0.061917985, 0.311070580]
+c_vals = [0.125370973, 0.345185732, 0.454443295]
+
+D = 10**9
+Ls = [R(QQ(int(round(l*D))))/R(D) for l in L_vals]
+cs = [R(QQ(int(round(c*D))))/R(D) for c in c_vals]
+
+print("=" * 62)
+print("Program 03 — Energy I(ρ) and Constant C*")
+print("=" * 62)
+print("Measure from Program 01:")
+for k in range(3):
+    print(f"  L_{k+1} = {L_vals[k]:.9f}   c_{k+1} = {c_vals[k]:.9f}")
+print(f"  mass = {float(sum(cs)):.12f}")
+print("-" * 62)
+
+# ---------- Energy I(ρ) ----------
+I_rho = R(0)
+S_prev = R(0)
+for j in range(3):
+    S_j = S_prev + cs[j]
+    I_rho += (S_j**2 - S_prev**2) * (Ls[j]/R(4)).log()
+    S_prev = S_j
+
+I_mid   = float(I_rho)
+I_lower = float(I_rho.lower())
+I_upper = float(I_rho.upper())
+
+print(f"I(ρ) = [{I_lower:.12f}, {I_upper:.12f}]")
+print(f"     ≈ {I_mid:.12f}")
+print("-" * 62)
+
+# ---------- Constant C_* ----------
+C = (-R(2)*lam
+     + R(4)*alpha*lam*(R(1) - alpha.log())
+     + R(3)*lam**2
+     - R(2)*lam**2*(R(2)*lam).log())
+
+C_mid   = float(C)
+C_lower = float(C.lower())
+C_upper = float(C.upper())
+
+print(f"C_* = [{C_lower:.12f}, {C_upper:.12f}]")
+print(f"     ≈ {C_mid:.12f}")
+print("-" * 62)
+
+# ---------- Checks ----------
+check_I_neg  = I_upper < 0
+check_I_size = -5.0 < I_mid < -1.0
+check_C_pos  = C_lower > 0
+check_C_size = 0.6 < C_mid < 0.7
+
+print("Sanity checks:")
+print(f"  I(ρ) < 0              : {check_I_neg}")
+print(f"  -5 < I(ρ) < -1        : {check_I_size}")
+print(f"  C_* > 0               : {check_C_pos}")
+print(f"  0.6 < C_* < 0.7       : {check_C_size}")
+print("-" * 62)
+
+ok = check_I_neg and check_I_size and check_C_pos and check_C_size
+print(f"==> {'PASS' if ok else 'FAIL'} (Program 03)")
+print("=" * 62)
