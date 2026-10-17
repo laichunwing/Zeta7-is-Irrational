@@ -1,0 +1,139 @@
+# ============================================================
+# Program 01 — Comparison Measure for ζ(7), ν=2
+# ============================================================
+# Optimizes a 3-interval arcsine measure ρ of mass λ = 37/40 to satisfy:
+#     max_{t≥0} [2U^ρ(t) - V(t)] ≤ -6.0
+# where V(t) = 2π√t + J_1(t) - 2 J_α(t),  α = 3/40.
+#
+# No file I/O. All output to stdout. Prints PASS/FAIL at end.
+# Runtime: ~30-60 seconds.
+# ============================================================
+
+from sage.all import *
+import numpy as np
+from scipy.optimize import minimize
+
+# ---------- Parameters ----------
+alpha = 0.075
+lam   = 0.925
+nu    = 2
+
+# ---------- Grid for max evaluation ----------
+t_grid = np.concatenate([
+    np.linspace(1e-6, 0.5, 400),
+    np.linspace(0.5, 3, 400),
+    np.linspace(3, 15, 100),
+])
+N_t = len(t_grid)
+
+def J_a_vec(a, t):
+    return a*np.log(t + a**2) - 2*a + 2*np.sqrt(t)*np.arctan(a/np.sqrt(t))
+
+V_t = 2*np.pi*np.sqrt(t_grid) + J_a_vec(1, t_grid) - nu*J_a_vec(alpha, t_grid)
+
+def U_arc_vec(L, t):
+    L = max(L, 1e-9)
+    result = np.where(t <= L, np.log(L/4), 0.0)
+    mask = t > L
+    if mask.any():
+        tt = t[mask]
+        result[mask] = np.log((tt - L/2 + np.sqrt(tt*(tt-L)))/2)
+    return result
+
+def M_rho(Ls, cs):
+    n = len(Ls)
+    U = np.zeros(N_t)
+    for j in range(n):
+        U += cs[j] * U_arc_vec(Ls[j], t_grid)
+    return np.max(2*U - V_t)
+
+def I_rho(Ls, cs):
+    n = len(Ls)
+    I = 0.0
+    for i in range(n):
+        for j in range(n):
+            I += cs[i]*cs[j]*np.log(max(Ls[i], Ls[j])/4)
+    return I
+
+def C_star():
+    return (-2*lam
+            + 2*nu*alpha*lam*(1 - np.log(alpha))
+            + 3*lam**2
+            - 2*lam**2*np.log(2*lam))
+
+# ---------- Objective with penalty for M_0 > -6.0 ----------
+n_int = 3
+
+def obj(x):
+    Ls = np.exp(x[:n_int])
+    raw = np.exp(x[n_int:])
+    cs = raw / raw.sum() * lam
+    M = M_rho(Ls, cs)
+    pen = 100.0 * max(0.0, M + 6.0)**2
+    return lam*M - I_rho(Ls, cs) + C_star() + pen
+
+# ---------- 20 restarts ----------
+np.random.seed(42)
+best = None
+n_restart = 20
+print(f"Running {n_restart} restarts of Nelder-Mead...")
+for trial in range(n_restart):
+    x0 = np.concatenate([
+        np.log(np.sort(np.random.rand(n_int)*1.5 + 0.1)),
+        np.log(np.random.rand(n_int) + 0.1)
+    ])
+    res = minimize(obj, x0, method='Nelder-Mead',
+                   options={'maxiter': 2000, 'xatol': 1e-7, 'fatol': 1e-7})
+    if best is None or res.fun < best.fun:
+        best = res
+    Ls_try = np.exp(res.x[:n_int])
+    raw_try = np.exp(res.x[n_int:])
+    cs_try = raw_try / raw_try.sum() * lam
+    M_try = M_rho(Ls_try, cs_try)
+    marker = " *" if best is res else ""
+    print(f"  restart {trial+1:2d}/{n_restart}: M_0 = {M_try:+.6f}{marker}")
+
+# ---------- Extract optimal ----------
+Ls = np.exp(best.x[:n_int])
+raw = np.exp(best.x[n_int:])
+cs = raw / raw.sum() * lam
+
+# Sort by increasing L
+idx = np.argsort(Ls)
+Ls = Ls[idx]
+cs = cs[idx]
+
+# ---------- Report ----------
+print()
+print("=" * 62)
+print("Program 01 — Comparison Measure for ζ(7), ν=2")
+print("=" * 62)
+print(f"ν = {nu}   α = {alpha}   λ = {lam}")
+print("-" * 62)
+print("Optimal measure (copy these into Programs 02, 03, 04):")
+for k in range(n_int):
+    print(f"  L_{k+1} = {Ls[k]:.9f}   c_{k+1} = {cs[k]:.9f}")
+print("-" * 62)
+print(f"Mass ∑ c_j         = {sum(cs):.12f}   (target 0.925)")
+print(f"M_0 = max(2U-V)    = {M_rho(Ls, cs):.12f}")
+print(f"I(ρ)               = {I_rho(Ls, cs):.12f}")
+print(f"C_*                = {C_star():.12f}")
+print(f"U = λM_0 - I + C*  = {lam*M_rho(Ls, cs) - I_rho(Ls, cs) + C_star():.12f}")
+print("-" * 62)
+
+M0_final = M_rho(Ls, cs)
+I_final = I_rho(Ls, cs)
+C_final = C_star()
+U_final = lam*M0_final - I_final + C_final
+
+checks = {
+    "Mass = λ":   abs(sum(cs) - lam) < 1e-10,
+    "M_0 ≤ -6.0": M0_final <= -6.0,
+    "U < 0":      U_final < 0,
+}
+for name, ok in checks.items():
+    print(f"  {name:<15}: {ok}")
+
+ok_all = all(checks.values())
+print(f"==> {'PASS' if ok_all else 'FAIL'} (Program 01)")
+print("=" * 62)
