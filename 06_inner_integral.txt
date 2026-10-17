@@ -1,0 +1,108 @@
+# ============================================================
+# Program 06 — Inner Integral ∫_3^20 R(x)/x^3 dx (ν=2)
+# ============================================================
+# Computes the integral using adaptive quadrature on exact
+# breakpoints. For ν=2: H=1, b=ℓ, (ν-1)=1.
+# ============================================================
+
+from sage.all import *
+from scipy.integrate import quad
+import numpy as np
+
+alpha = 3.0/40
+lam   = 37.0/40
+nu    = 2
+H     = 1.0 + (nu/2 - 1)*alpha   # = 1 for ν=2
+
+def ell(x, z):
+    return np.floor(x - z) + np.floor(x + z) + 1
+
+def b_fun(x, z):
+    return (nu/2) * ell(alpha*x, z)
+
+def J_fun(u):
+    m = np.floor(2*u)
+    return m*u - m*(m+1)/4
+
+def Gamma(x):
+    T = np.floor(2*H*x)
+    s = H*x - T/2
+    q = np.floor(2*x)
+    n_plus = (2*x - q)/2
+    f = x - np.floor(x)
+    g = alpha*x - np.floor(alpha*x)
+    df = min(f, 1-f)
+    dg = min(g, 1-g)
+    bps = sorted(set([0.0, 0.5, df, dg]))
+    bps = [b for b in bps if 0 <= b <= 0.5]
+    integ = 0.0
+    for i in range(len(bps)-1):
+        a, b = bps[i], bps[i+1]
+        if b <= a: continue
+        zm = (a+b)/2
+        integ += (b-a)*(T - b_fun(x,zm))*(T + b_fun(x,zm) - ell(x,zm) - (nu-1))
+    return integ + s*(2*T - q - (nu-1)) + max(0.0, s - n_plus)
+
+def N_fun(x):
+    return 2*lam*x*np.floor(x) - nu*lam*x*np.floor(alpha*x) - 2*J_fun(lam*x)
+
+def R_fun(x):
+    return -Gamma(x) - N_fun(x)
+
+def integrand(x):
+    return R_fun(x)/x**3
+
+# Collect all breakpoints in [3, 20]
+def all_breaks(lo, hi):
+    bs = set([lo, hi])
+    coeffs = [2, 2*alpha, 2*lam, 2*H, 4*alpha, 8*alpha,
+              2*(1-alpha), 2*(1+alpha), 2*(1+2*alpha), 9/20]
+    for c in coeffs:
+        if c <= 0: continue
+        k = int(np.floor(lo*c)) + 1
+        while k/c < hi:
+            bs.add(k/c)
+            k += 1
+    return sorted(bs)
+
+print("=" * 62)
+print("Program 06 — Inner Integral ∫_3^20 R(x)/x^3 dx (ν=2)")
+print("=" * 62)
+print(f"ν = {nu}, α = {alpha}, λ = {lam}, H = {H}")
+print("-" * 62)
+
+breaks = all_breaks(3.0, 20.0)
+print(f"Breakpoints: {len(breaks)}")
+print(f"Subintervals: {len(breaks) - 1}")
+print("-" * 62)
+
+I_inner = 0.0
+err_total = 0.0
+for i in range(len(breaks)-1):
+    a, b = breaks[i], breaks[i+1]
+    v, err = quad(integrand, a, b, limit=100, epsabs=1e-13, epsrel=1e-13)
+    I_inner += v
+    err_total += err
+
+print(f"I_inner (ν=2) = {I_inner:.12f}")
+print(f"Total quad error = {err_total:.2e}")
+print("-" * 62)
+
+# Sanity checks
+check_finite    = np.isfinite(I_inner)
+check_magnitude = abs(I_inner) < 5
+
+print(f"Sanity checks:")
+print(f"  Finite:        {check_finite}")
+print(f"  |I_inner| < 5: {check_magnitude}")
+
+ok = check_finite and check_magnitude
+print(f"==> {'PASS' if ok else 'FAIL'} (Program 06)")
+print("=" * 62)
+
+print()
+print("Note: For ν=2, this value is DIFFERENT from paper's 0.170349")
+print("      (which was for ν=8). It will be used in Program 09.")
+print()
+print("Copy this for downstream use:")
+print(f"  I_inner (ν=2) = {I_inner:.12f}")

@@ -1,0 +1,99 @@
+# ============================================================
+# Program 08 — Tail Integral A_0 = ∫_20^∞ R(x)/x^3 dx (ν=2)
+# CORRECTED: N(x) coefficient is 2νλ, not νλ.
+# ============================================================
+
+from sage.all import *
+from scipy.integrate import quad
+import numpy as np
+
+alpha = 3.0/40
+lam   = 37.0/40
+nu    = 2
+H     = 1.0 + (nu/2 - 1)*alpha   # = 1 for ν=2
+
+def ell(x, z):
+    return np.floor(x - z) + np.floor(x + z) + 1
+
+def b_fun(x, z):
+    return (nu/2) * ell(alpha*x, z)
+
+def J_fun(u):
+    m = np.floor(2*u)
+    return m*u - m*(m+1)/4
+
+def Gamma(x):
+    T = np.floor(2*H*x)
+    s = H*x - T/2
+    q = np.floor(2*x)
+    n_plus = (2*x - q)/2
+    f = x - np.floor(x)
+    g = alpha*x - np.floor(alpha*x)
+    df = min(f, 1-f)
+    dg = min(g, 1-g)
+    bps = sorted(set([0.0, 0.5, df, dg]))
+    bps = [b for b in bps if 0 <= b <= 0.5]
+    integ = 0.0
+    for i in range(len(bps)-1):
+        a, b = bps[i], bps[i+1]
+        if b <= a: continue
+        zm = (a+b)/2
+        integ += (b-a)*(T - b_fun(x,zm))*(T + b_fun(x,zm) - ell(x,zm) - (nu-1))
+    return integ + s*(2*T - q - (nu-1)) + max(0.0, s - n_plus)
+
+def N_fun(x):
+    # CORRECTED: 2*nu*lam (not nu*lam) on the alpha term
+    return 2*lam*x*np.floor(x) - 2*nu*lam*x*np.floor(alpha*x) - 2*J_fun(lam*x)
+
+def R_fun(x):
+    return -Gamma(x) - N_fun(x)
+
+def integrand(x):
+    return R_fun(x)/x**3
+
+X_cut = 5000.0
+print("=" * 62)
+print("Program 08 — Tail Integral A_0 (ν=2, CORRECTED)")
+print("=" * 62)
+print(f"ν = {nu}, α = {alpha}, λ = {lam}, H = {H}")
+print(f"X_cut = {X_cut}")
+print("-" * 62)
+
+pieces = [(20, 50), (50, 100), (100, 300), (300, 1000), (1000, X_cut)]
+I_main = 0.0
+err_total = 0.0
+print("Adaptive quadrature on [20, X_cut]:")
+for a, b in pieces:
+    v, err = quad(integrand, a, b, limit=500, epsabs=1e-10, epsrel=1e-10)
+    I_main += v
+    err_total += err
+    print(f"  ∫_{a:>5}^{b:>5}  = {v:+.10f}   (err = {err:.1e})")
+
+tail = -lam/X_cut
+A0 = I_main + tail
+
+print("-" * 62)
+print(f"I_main [20, {X_cut}]  = {I_main:+.10f}")
+print(f"Tail correction -λ/X  = {tail:+.10f}")
+print(f"A_0 (total)           = {A0:+.10f}")
+print(f"Total quad error      = {err_total:.2e}")
+print("-" * 62)
+
+# Sanity checks
+check_finite = np.isfinite(A0)
+check_range  = -2.0 < A0 < 2.0
+
+print("Sanity checks:")
+print(f"  Finite:        {check_finite}")
+print(f"  -2 < A_0 < 2:  {check_range}")
+
+ok = check_finite and check_range
+print(f"==> {'PASS' if ok else 'FAIL'} (Program 08)")
+print("=" * 62)
+
+print()
+print("Copy this for downstream use:")
+print(f"  A_0 = {A0:+.10f}")
+print()
+print("If A_0 changed significantly from the previous run (-0.769),")
+print("note the new value and proceed to Program 09.")

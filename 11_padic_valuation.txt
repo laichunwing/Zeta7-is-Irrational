@@ -1,0 +1,180 @@
+# ============================================================
+# Program 11 — Direct p-Adic Validation (FAST via interpolation)
+# ============================================================
+# Instead of symbolic det of 37×37 polynomial matrix (very slow),
+# build A, B ∈ M_37(QQ) with G_K(X) = A + XB, then:
+#   Δ(X) = det(A + XB) via interpolation at 38 points.
+# ============================================================
+
+from sage.all import *
+import time
+
+K_val = 40
+nu    = 2
+N_val = (3 * K_val) // 40
+h_val = (37 * K_val) // 40
+
+print("=" * 72)
+print("Program 11 — Direct p-adic Validation (FAST, K=40, ν=2)")
+print("=" * 72)
+print(f"K = {K_val},  N = {N_val},  h = {h_val},  ν = {nu}")
+print(f"Outer range: {float(K_val)/3:.2f} < p ≤ {K_val}")
+print("-" * 72)
+
+# ---------- Ring for polynomials in t ----------
+Qt = PolynomialRing(QQ, 't'); t = Qt.gen()
+
+# ---------- Precompute ----------
+print("Precomputing D_N, D_K, D_K'...")
+t0 = time.time()
+D_N = Qt(1)
+for k in range(1, N_val + 1):
+    D_N *= (t + k**2)
+D_K = Qt(1)
+for k in range(1, K_val + 1):
+    D_K *= (t + k**2)
+D_K_prime = D_K.derivative()
+
+H_vals = {j: sum(QQ(1)/QQ(v)**7 for v in range(1, j+1))
+          for j in range(1, K_val + 1)}
+D_Kp_at_pole = {j: D_K_prime(-j**2) for j in range(1, K_val + 1)}
+D_N_nu = D_N**nu
+print(f"  Done in {time.time()-t0:.2f}s")
+print("-" * 72)
+
+# ---------- mu entry returning (a, b) with entry = a + b·X ----------
+def mu_entry_affine(i, j):
+    """Return (a, b) such that μ_X(D_N^ν · t^(i+j) / D_K) = a + b·X."""
+    R_num = D_N_nu * t**(i + j)
+    Q_poly, R_rem = R_num.quo_rem(D_K)
+
+    a = QQ(0)
+    b = QQ(0)
+
+    # Polynomial part: sum μ_X(t^e) * coeff (independent of X)
+    for e in range(Q_poly.degree() + 1):
+        coeff = Q_poly[e]
+        if coeff == 0:
+            continue
+        B_e = bernoulli(2*e + 2)
+        val = (-1)**e * B_e * (2*e+3)*(2*e+4)*(2*e+5)*(2*e+6)*(2*e+7) / QQ(720)
+        a += coeff * val
+
+    # Pole part: sum c_j * (j^6(X - H_j) + 1/(2j) - 1/6)
+    # = (sum c_j · j^6) X  +  sum c_j · (1/(2j) - 1/6 - j^6 H_j)
+    for j_pole in range(1, K_val + 1):
+        c = R_rem(-j_pole**2) / D_Kp_at_pole[j_pole]
+        if c == 0:
+            continue
+        Hj = H_vals[j_pole]
+        b += c * j_pole**6
+        a += c * (QQ(1)/(2*j_pole) - QQ(1)/6 - j_pole**6 * Hj)
+
+    return (a, b)
+
+# ---------- Build A, B matrices ----------
+print(f"Building A, B ∈ M_{h_val}(ℚ)...")
+t0 = time.time()
+A = matrix(QQ, h_val, h_val)
+B = matrix(QQ, h_val, h_val)
+for i in range(h_val):
+    for j in range(h_val):
+        a, b = mu_entry_affine(i, j)
+        A[i, j] = a
+        B[i, j] = b
+    if (i + 1) % 10 == 0:
+        print(f"  row {i+1}/{h_val}  ({time.time()-t0:.1f}s)")
+print(f"  Done in {time.time()-t0:.1f}s")
+print("-" * 72)
+
+# ---------- Compute Δ(x_k) at 38 points ----------
+print(f"Computing det(A + x·B) at {h_val+1} points...")
+t0 = time.time()
+pts = list(range(h_val + 1))
+vals = []
+for idx, xk in enumerate(pts):
+    M = A + QQ(xk) * B
+    vals.append(M.det())
+    if (idx + 1) % 10 == 0:
+        print(f"  point {idx+1}/{h_val+1}  ({time.time()-t0:.1f}s)")
+print(f"  All determinants in {time.time()-t0:.1f}s")
+print("-" * 72)
+
+# ---------- Interpolate Δ(X) ----------
+print("Interpolating Δ(X)...")
+t0 = time.time()
+QXR = PolynomialRing(QQ, 'X')
+Delta = QXR.lagrange_polynomial(list(zip(pts, vals)))
+print(f"  Done in {time.time()-t0:.1f}s")
+print(f"  degree(Δ_K) = {Delta.degree()}")
+n_nonzero = sum(1 for c in Delta.list() if c != 0)
+print(f"  nonzero coefficients: {n_nonzero}")
+print("-" * 72)
+
+# ---------- Formulas ----------
+def gamma_out(K, p, nu):
+    N = (3*K) // 40
+    h = (37*K) // 40
+    v = K - p * (K // p)
+    u = max(0, N + v - p + 1)
+    t_p = min(N, v) + u
+    r_p = min(h, max(0, 2*h - K + nu*N - 2*p + 2))
+    if K < 2*p:
+        return -9*(K-p) + nu*t_p - 1 - min(r_p, p-1-N+u)
+    else:
+        return -9*(K-p) + 3 + 2*nu*N + (nu-1)*t_p - min(r_p, p+u)
+
+def vp_G(Delta, p):
+    vals = [c.valuation(p) for c in Delta.list() if c != 0]
+    return min(vals)
+
+# ---------- Validate outer primes ----------
+print("Validation: v_p^G(Δ_K) ≥ γ_p^out for each p in outer range")
+print("-" * 72)
+print(f"{'p':>4}  {'v_p(Δ_K)':>10}  {'γ_p^out':>10}  {'slack':>8}  {'pass':>5}")
+print("-" * 72)
+
+outer_primes = [p for p in [11, 13, 17, 19, 23, 29, 31, 37]
+                if p > K_val/3 and p <= K_val]
+
+all_pass = True
+for p in outer_primes:
+    vp_actual = vp_G(Delta, p)
+    go = gamma_out(K_val, p, nu)
+    slack = vp_actual - go
+    passes = slack >= 0
+    if not passes:
+        all_pass = False
+    marker = "✓" if passes else "✗"
+    print(f"{p:>4}  {vp_actual:>10}  {go:>10}  {slack:>8}  {marker:>5}")
+
+print("-" * 72)
+print(f"All outer primes pass: {all_pass}")
+print("=" * 72)
+
+# ---------- p > K check ----------
+print()
+print("Additional: primes p > K (should have v_p^G(Δ_K) ≥ 0)")
+print("-" * 72)
+print(f"{'p':>4}  {'v_p(Δ_K)':>10}  {'pass':>5}")
+for p in [41, 43, 47, 53, 59, 61, 67, 71, 73]:
+    if p > K_val:
+        vp_actual = vp_G(Delta, p)
+        passes = vp_actual >= 0
+        if not passes:
+            all_pass = False
+        marker = "✓" if passes else "✗"
+        print(f"{p:>4}  {vp_actual:>10}  {marker:>5}")
+print("-" * 72)
+
+# ---------- Summary ----------
+print()
+print("=" * 72)
+print("SUMMARY")
+print("=" * 72)
+print(f"Matrix size:      {h_val} × {h_val}")
+print(f"Degree Δ_K:       {Delta.degree()}")
+print(f"Nonzero coeffs:   {n_nonzero}")
+print(f"All checks pass:  {all_pass}")
+print(f"==> {'PASS' if all_pass else 'FAIL'} (Program 11)")
+print("=" * 72)

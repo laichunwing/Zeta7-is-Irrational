@@ -1,0 +1,113 @@
+# ============================================================
+# Program 10 — Approximation Exponent for Corollary 1.3
+# ============================================================
+# Computes the exponent e such that |ζ(7) - a/b| > b^{-e}
+# for all sufficiently large b, using:
+#   κ ≈ 13         (Program 05, upper bound)
+#   ε ≈ 0.573      (Program 09, A_100000 + U)
+#   λ = 0.925
+#   c = 75/4       (paper's choice)
+# ============================================================
+
+from sage.all import *
+
+print("=" * 62)
+print("Program 10 — Approximation Exponent (ν=2)")
+print("=" * 62)
+
+# ---------- Inputs ----------
+kappa   = QQ(13)                    # from Program 05 (rounded up)
+epsilon = QQ(573) / QQ(1000)        # from Program 09 (conservative)
+lam     = QQ(37)/QQ(40)
+c_paper = QQ(75) / QQ(4)            # 18.75 (paper's choice)
+
+print("Inputs:")
+print(f"  κ (Program 05)     = {float(kappa):.6f}    (upper bound)")
+print(f"  ε (Program 09)     = {float(epsilon):.6f}    (= -(A_100000 + U))")
+print(f"  λ                   = {float(lam):.6f}")
+print(f"  c (paper's choice) = {float(c_paper):.6f}")
+print("-" * 62)
+
+# ---------- Check conditions ----------
+# Condition 1: λ < ε·c  (decay dominates perturbation growth)
+cond1_lhs = lam
+cond1_rhs = epsilon * c_paper
+cond1 = cond1_lhs < cond1_rhs
+print("Condition 1 (decay dominates):")
+print(f"  λ          = {float(cond1_lhs):.6f}")
+print(f"  ε · c      = {float(cond1_rhs):.6f}")
+print(f"  λ < ε·c :  {cond1}")
+print("-" * 62)
+
+# Condition 2: e > κ·c  (perturbation bounded)
+kc = kappa * c_paper
+print("Condition 2 (perturbation bounded):")
+print(f"  κ · c      = {float(kc):.6f}")
+print(f"  Need e > {float(kc):.6f}")
+print("-" * 62)
+
+# ---------- Compute the exponent ----------
+e_min = int(kc) + 1   # ceiling
+buffer = 10
+e_safe = e_min + buffer
+
+print("Exponent computation:")
+print(f"  e_min = ⌈κc⌉ = {e_min}")
+print(f"  e_safe = e_min + {buffer} = {e_safe}")
+print("-" * 62)
+
+# ---------- Alternative with minimal c ----------
+# Choose c just above λ/ε for a much smaller exponent
+c_min = lam / epsilon
+c_safe_small = c_min * QQ(11) / QQ(10)   # 10% margin above minimal
+
+kc_small = kappa * c_safe_small
+e_small_min = int(kc_small) + 1
+e_small_safe = e_small_min + buffer
+
+print("Alternative (smaller c → smaller exponent):")
+print(f"  c_min = λ/ε        = {float(c_min):.6f}")
+print(f"  c_safe_small = 1.1·c_min = {float(c_safe_small):.6f}")
+print(f"  κ · c_safe_small   = {float(kc_small):.6f}")
+print(f"  e_min = ⌈κc⌉       = {e_small_min}")
+print(f"  e_safe = e_min + {buffer} = {e_small_safe}")
+print("-" * 62)
+
+# ---------- Report ----------
+print("=" * 62)
+print("Program 10 — Approximation Bound Summary")
+print("=" * 62)
+print()
+print("Option A (paper's choice, c = 75/4):")
+print(f"  Conditions: λ < εc : {cond1},   e > κc : {e_safe > kc}")
+print(f"  Exponent e = {e_safe}")
+print(f"  Conclusion: |ζ(7) - a/b| > b^(-{e_safe}) for all sufficiently large b.")
+print()
+print("Option B (minimal c ≈ {:.3f}):".format(float(c_safe_small)))
+print(f"  Conditions: λ < εc : {lam < epsilon * c_safe_small},   e > κc : {e_small_safe > kc_small}")
+print(f"  Exponent e = {e_small_safe}")
+print(f"  Conclusion: |ζ(7) - a/b| > b^(-{e_small_safe}) for all sufficiently large b.")
+print()
+print("Comparison with paper:")
+print(f"  Paper (ν=8, fake constants): e = 270")
+print(f"  This work (ν=2, Option A):   e = {e_safe}")
+print(f"  This work (ν=2, Option B):   e = {e_small_safe}")
+print()
+print("IRRATIONALITY EXPONENT μ(ζ(7)):")
+print(f"  μ ≤ {e_safe}   (Option A)")
+print(f"  μ ≤ {e_small_safe}   (Option B)")
+print()
+
+# ---------- Verification ----------
+both_conditions = cond1 and (e_safe > kc)
+both_conditions_small = (lam < epsilon * c_safe_small) and (e_small_safe > kc_small)
+ok = both_conditions and both_conditions_small
+
+print(f"==> {'PASS' if ok else 'FAIL'} (Program 10)")
+print("=" * 62)
+
+print()
+print("Copy this for downstream use:")
+print(f"  e (Option A) = {e_safe}")
+print(f"  e (Option B) = {e_small_safe}")
+print(f"  Recommended:  μ(ζ(7)) ≤ {e_safe}")

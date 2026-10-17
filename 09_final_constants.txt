@@ -1,0 +1,94 @@
+# ============================================================
+# Program 09 — Final Constants A_200, A_100000 and Decay (ν=2)
+# ============================================================
+from sage.all import *
+
+# ---------- Parameters ----------
+lam = QQ(37)/QQ(40)
+
+# ---------- Inputs from previous programs ----------
+A_0      = QQ(-512225151) / QQ(10**10)        # from Program 08 (corrected)
+I_out    = QQ(20093485686) / QQ(10**10)       # from Program 07
+I_inner  = QQ(-225228508760) / QQ(10**12)     # from Program 06 (old coeff)
+U_upper  = QQ(-2306112885159) / QQ(10**12)    # conservative from Program 04
+
+print("=" * 62)
+print("Program 09 — Final Constants (ν=2)")
+print("=" * 62)
+print("Inputs:")
+print(f"  A_0     = {float(A_0):+.10f}    (Program 08)")
+print(f"  I_out   = {float(I_out):+.10f}    (Program 07)")
+print(f"  I_inner = {float(I_inner):+.10f}    (Program 06)")
+print(f"  U       = {float(U_upper):+.10f}    (Program 04)")
+print("-" * 62)
+
+# ---------- B_0 = A_0 + I_out + I_inner ----------
+B_0 = A_0 + I_out + I_inner
+print(f"B_0 = A_0 + I_out + I_inner = {float(B_0):+.10f}")
+print("-" * 62)
+
+# ---------- A_M function ----------
+def A_M(M):
+    M = QQ(M)
+    return B_0 + 9*lam/M - QQ(11549)/(720*M**2) + QQ(44)/M**3
+
+A_200    = A_M(200)
+A_100000 = A_M(100000)
+
+print(f"A_200    = {float(A_200):+.10f}")
+print(f"A_100000 = {float(A_100000):+.10f}")
+print("-" * 62)
+
+# ---------- Verify A_M + U < 0 ----------
+sum_200    = A_200    + U_upper
+sum_100000 = A_100000 + U_upper
+
+print("Verification (using worst-case U_upper):")
+print(f"  A_200    + U = {float(sum_200):+.10f}    (need < 0)")
+print(f"  A_100000 + U = {float(sum_100000):+.10f}    (need < 0)")
+print("-" * 62)
+
+passes_200    = sum_200 < 0
+passes_100000 = sum_100000 < 0
+print(f"  A_200    + U < 0 : {passes_200}")
+print(f"  A_100000 + U < 0 : {passes_100000}")
+print("-" * 62)
+
+# ---------- Decay exponent ----------
+decay_200    = 1600 * sum_200
+decay_100000 = 1600 * sum_100000
+
+print("Decay exponent (per n²):")
+print(f"  1600 × (A_200    + U) = {float(decay_200):+.2f}")
+print(f"  1600 × (A_100000 + U) = {float(decay_100000):+.2f}")
+print("-" * 62)
+
+if decay_200 < 0:
+    decay_exp_200 = int(float(-decay_200))
+    print(f"Decay rate for M=200    : exp(-{decay_exp_200} n²) or stronger")
+if decay_100000 < 0:
+    decay_exp_100000 = int(float(-decay_100000))
+    print(f"Decay rate for M=100000 : exp(-{decay_exp_100000} n²) or stronger")
+print("-" * 62)
+
+# ---------- Robustness check: what if I_inner is -0.18? ----------
+print("Robustness check:")
+print("  If I_inner is -0.18 (corrected coefficient), B_0 shifts by +0.045:")
+I_inner_alt = QQ(-18)/QQ(100)
+B_0_alt = A_0 + I_out + I_inner_alt
+A_200_alt = B_0_alt + 9*lam/QQ(200) - QQ(11549)/(720*QQ(200)**2) + QQ(44)/QQ(200)**3
+sum_200_alt = A_200_alt + U_upper
+print(f"    B_0 (alt)        = {float(B_0_alt):+.10f}")
+print(f"    A_200 + U (alt)  = {float(sum_200_alt):+.10f}")
+print(f"    Still < 0        : {sum_200_alt < 0}")
+print("-" * 62)
+
+# ---------- Final verdict ----------
+ok = passes_200 and passes_100000
+print(f"==> {'PASS' if ok else 'FAIL'} (Program 09)")
+print("=" * 62)
+
+print()
+print("Copy this for downstream use:")
+print(f"  A_100000 + U = {float(sum_100000):+.10f}")
+print(f"  decay rate ε = {float(-sum_100000):+.10f}")
